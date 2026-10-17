@@ -373,123 +373,119 @@ with tab_stats:
 with tab_game:
     if game["phase"] == "locked":
         pending = game["pending"]
-    st.markdown(
-        '<div class="status-panel">'
-        '<h3>🔒 대결이 안전하게 잠겼어요</h3>'
-        '저장 결과를 확인하지 못했어요. 중복 기록을 막기 위해 '
-        '재선택과 진행을 제한합니다.'
-        '<br>교사에게 아래 게임 ID와 대결 정보를 알려 '
-        'Supabase 기록을 확인받으세요.</div>',
-        unsafe_allow_html=True,
-    )
-    if pending:
-        st.error(
-            f"확인이 필요한 대결: {pending['round']} · "
-            f"{pending['left_menu']} VS {pending['right_menu']} · "
-            f"선택: {pending['winner']}"
+        st.markdown(
+            '<div class="status-panel"><h3>🔒 대결이 안전하게 잠겼어요</h3>'
+            '저장 결과를 확인하지 못했습니다. 재선택과 진행을 제한합니다.'
+            '<br>교사에게 게임 ID와 대결 정보를 알려 확인받으세요.</div>',
+            unsafe_allow_html=True,
         )
-    st.code(game["game_id"], language=None)
-    st.caption("서버 응답이 유실됐어도 실제로 저장되었을 수 있어 자동 재전송하지 않아요.")
-    st.stop()
+        if pending:
+            st.error(
+                f"확인할 대결: {pending['round']} · "
+                f"{pending['left_menu']} VS {pending['right_menu']} · "
+                f"선택: {pending['winner']}"
+            )
+        st.code(game["game_id"], language=None)
+        st.caption("서버에서 저장했으나 응답만 유실되었을 수도 있어 자동 재전송하지 않습니다.")
 
-    if game["phase"] == "done":
-    if not game["celebrated"]:
-        st.balloons()
-        game["celebrated"] = True
-    st.markdown(confetti_effects(), unsafe_allow_html=True)
-    icon = MENU_STYLE[game["champion"]][0]
-    st.markdown(
-        '<div class="champion-wrap"><div class="champion-content">'
-        '<div class="champion-mini">THE ONE AND ONLY WINNER</div>'
-        '<div class="champion-crown">👑</div>'
-        f'<div class="champion-name">{icon} {escape(game["champion"])} {icon}</div>'
-        '<div class="trophy-divider"></div>'
-        '<p class="champion-desc">🏆 일곱 번의 승부를 모두 저장 확인했어요!</p>'
-        '</div></div>',
-        unsafe_allow_html=True,
-    )
-    if st.button("🔁 새로운 월드컵 시작하기", use_container_width=True, type="primary"):
-        st.session_state["meal_worldcup"] = start_game()
-        st.rerun()
-    with st.expander("🏅 이번 월드컵의 승리 기록 (7경기)", expanded=True):
-        st.markdown(winner_history(game), unsafe_allow_html=True)
-    st.markdown(
-        f'<div class="game-id">GAME ID · {escape(game["game_id"][:12])}</div>',
-        unsafe_allow_html=True,
-    )
-    st.stop()
-
-    if game["round_intro"]:
-    st.markdown(
-        '<div class="round-transition" aria-hidden="true">'
-        f'<div class="transition-text">⚡ {escape(game["round_intro"])} ⚡</div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-    game["round_intro"] = None
-
-    if game["last_result"]:
-    st.markdown(
-        f'<div class="win-flash">✨ <strong>{escape(game["last_result"])}</strong>'
-        ' 승리! &nbsp; | &nbsp; 저장 확인 완료 ✅</div>',
-        unsafe_allow_html=True,
-    )
-
-    left_menu, right_menu = current_pair(game)
-    round_title = round_name(len(game["participants"]))
-    match_no = game["match_index"] + 1
-    match_total = len(game["participants"]) // 2
-
-    st.markdown(
-    f'<div class="section-eyebrow">⚡ ROUND {escape(round_title)} · '
-    f'FIGHT {match_no:02}/{match_total:02} ⚡</div>'
-    '<div class="section-title">누가 다음 라운드에 진출할까?</div>'
-    f'<div class="section-sub">전체 {completed + 1}번째 선택 · '
-    '마음에 드는 반찬 하나를 눌러 주세요</div>',
-    unsafe_allow_html=True,
-    )
-    st.markdown(
-    '<div class="vs-area"><div class="vs-core">VS</div></div>',
-    unsafe_allow_html=True,
-    )
-
-    left_col, right_col = st.columns(2, gap="medium")
-    with left_col:
-    with st.container(border=True):
-        st.markdown(duel_card(left_menu, "left"), unsafe_allow_html=True)
-        choose_left = st.button(
-            f"💜 {left_menu} 선택",
-            key=f"{game['game_id']}-{completed}-left",
-            use_container_width=True,
-            type="primary",
+    elif game["phase"] == "done":
+        if not game["celebrated"]:
+            st.balloons()
+            game["celebrated"] = True
+        st.markdown(confetti_effects(), unsafe_allow_html=True)
+        icon = MENU_STYLE[game["champion"]][0]
+        st.markdown(
+            '<div class="champion-wrap"><div class="champion-content">'
+            '<div class="champion-mini">THE ONE AND ONLY WINNER</div>'
+            '<div class="champion-crown">👑</div>'
+            f'<div class="champion-name">{icon} {escape(game["champion"])} {icon}</div>'
+            '<div class="trophy-divider"></div>'
+            '<p class="champion-desc">🏆 일곱 번의 승부를 모두 저장 확인했어요!</p>'
+            '</div></div>',
+            unsafe_allow_html=True,
         )
-    with right_col:
-    with st.container(border=True):
-        st.markdown(duel_card(right_menu, "right"), unsafe_allow_html=True)
-        choose_right = st.button(
-            f"💠 {right_menu} 선택",
-            key=f"{game['game_id']}-{completed}-right",
-            use_container_width=True,
-            type="primary",
+        if st.button("🔁 새로운 월드컵 시작하기", use_container_width=True, type="primary"):
+            st.session_state["meal_worldcup"] = start_game()
+            st.rerun()
+        with st.expander("🏅 이번 월드컵의 승리 기록 (7경기)", expanded=True):
+            st.markdown(winner_history(game), unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="game-id">GAME ID · {escape(game["game_id"][:12])}</div>',
+            unsafe_allow_html=True,
         )
 
-    st.markdown(
-    '<div class="hint-note">🛡️ 한 대결당 한 번만 투표 · '
-    '저장 확인 후에만 다음 경기로 진출</div>',
-    unsafe_allow_html=True,
-    )
-    if completed:
-    with st.expander(f"📜 지금까지의 승리 기록 · {completed}대결"):
-        st.markdown(winner_history(game), unsafe_allow_html=True)
+    else:
+        if game["round_intro"]:
+            st.markdown(
+                '<div class="round-transition" aria-hidden="true">'
+                f'<div class="transition-text">⚡ {escape(game["round_intro"])} ⚡</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            game["round_intro"] = None
 
-    st.markdown(
-    f'<div class="game-id">🔐 익명 게임 · ID {escape(game["game_id"][:12])}'
-    ' · 개인 정보 입력 없음</div>',
-    unsafe_allow_html=True,
-    )
+        if game["last_result"]:
+            st.markdown(
+                f'<div class="win-flash">✨ <strong>{escape(game["last_result"])}</strong>'
+                ' 승리! &nbsp; | &nbsp; 저장 확인 완료 ✅</div>',
+                unsafe_allow_html=True,
+            )
 
-    if choose_left or choose_right:
-    selected = left_menu if choose_left else right_menu
-    with st.spinner("⚡ 기록 저장 및 승리 확인 중..."):
-        save_and_advance(selected)
-    st.rerun()
+        left_menu, right_menu = current_pair(game)
+        round_title = round_name(len(game["participants"]))
+        match_no = game["match_index"] + 1
+        match_total = len(game["participants"]) // 2
+
+        st.markdown(
+            f'<div class="section-eyebrow">⚡ ROUND {escape(round_title)} · '
+            f'FIGHT {match_no:02}/{match_total:02} ⚡</div>'
+            '<div class="section-title">누가 다음 라운드에 진출할까?</div>'
+            f'<div class="section-sub">전체 {completed + 1}번째 선택 · '
+            '마음에 드는 반찬 하나를 눌러 주세요</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="vs-area"><div class="vs-core">VS</div></div>',
+            unsafe_allow_html=True,
+        )
+
+        left_col, right_col = st.columns(2, gap="medium")
+        with left_col:
+            with st.container(border=True):
+                st.markdown(duel_card(left_menu, "left"), unsafe_allow_html=True)
+                choose_left = st.button(
+                    f"💜 {left_menu} 선택",
+                    key=f"{game['game_id']}-{completed}-left",
+                    use_container_width=True,
+                    type="primary",
+                )
+        with right_col:
+            with st.container(border=True):
+                st.markdown(duel_card(right_menu, "right"), unsafe_allow_html=True)
+                choose_right = st.button(
+                    f"💠 {right_menu} 선택",
+                    key=f"{game['game_id']}-{completed}-right",
+                    use_container_width=True,
+                    type="primary",
+                )
+
+        st.markdown(
+            '<div class="hint-note">🛡️ 한 대결당 한 번만 투표 · '
+            '저장 확인 후에만 다음 경기로 진출</div>',
+            unsafe_allow_html=True,
+        )
+        if completed:
+            with st.expander(f"📜 지금까지의 승리 기록 · {completed}대결"):
+                st.markdown(winner_history(game), unsafe_allow_html=True)
+
+        st.markdown(
+            f'<div class="game-id">🔐 익명 게임 · ID {escape(game["game_id"][:12])}'
+            ' · 개인 정보 입력 없음</div>',
+            unsafe_allow_html=True,
+        )
+
+        if choose_left or choose_right:
+            selected = left_menu if choose_left else right_menu
+            with st.spinner("⚡ 기록 저장 및 승리 확인 중..."):
+                save_and_advance(selected)
+            st.rerun()
