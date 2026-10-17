@@ -6,6 +6,7 @@ from uuid import uuid4
 from html import escape
 
 import streamlit as st
+import plotly.graph_objects as go
 from supabase import create_client
 
 MENUS = (
@@ -136,7 +137,73 @@ def save_and_advance(winner: str) -> None:
 
 
 
-MENU_STYLE = {
+MENU_
+def show_class_analysis():
+    st.subheader("📊 학급 전체 급식 월드컵 분석")
+    if st.button("🔄 결과 다시 불러오기", key="reload_stats"):
+        st.session_state.pop("class_stats", None)
+    if "class_stats" not in st.session_state:
+        try:
+            client = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+            rows, last_id = [], 0
+            while True:
+                batch = (client.table("menu_duels")
+                         .select("id,game_id,round,left_menu,right_menu,winner")
+                         .gt("id", last_id).order("id").limit(1000).execute().data)
+                if not isinstance(batch, list):
+                    raise ValueError("조회 결과 형식 오류")
+                if not batch:
+                    break
+                for item in batch:
+                    if type(item.get("id")) is not int or item["id"] <= last_id:
+                        raise ValueError("대결 ID 오류")
+                    last_id = item["id"]
+                    rows.append(item)
+                if len(batch) < 1000:
+                    break
+            st.session_state["class_stats"] = ("ok", rows)
+        except Exception:
+            st.session_state["class_stats"] = ("error", [])
+    state, rows = st.session_state["class_stats"]
+    if state == "error":
+        st.error("대결 기록 조회에 실패했습니다. Supabase 접속 정보와 SELECT 권한을 확인한 뒤 다시 불러오세요.")
+        return
+    if not rows:
+        st.info("아직 저장된 대결 기록이 없습니다. 첫 대결이 저장되면 분석이 시작됩니다.")
+    games = {str(r["game_id"]) for r in rows if r.get("game_id")}
+    a, b = st.columns(2)
+    a.metric("집계 대결 기록", f"{len(rows):,}건")
+    b.metric("집계 판 수", f"{len(games):,}판")
+    st.caption("대결 기록 수와 참여 인원은 다릅니다. 진행 중인 판에서 저장된 대결도 집계됩니다. 판 수는 서로 다른 game_id 기준이며 참여 인원 수가 아닙니다.")
+    data = {m: {"반찬": m, "대결 수": 0, "승리 수": 0, "우승 횟수": 0} for m in MENUS}
+    for r in rows:
+        left, right, winner = r.get("left_menu"), r.get("right_menu"), r.get("winner")
+        if left in data:
+            data[left]["대결 수"] += 1
+        if right in data:
+            data[right]["대결 수"] += 1
+        if winner in data:
+            data[winner]["승리 수"] += 1
+            if r.get("round") == "결승":
+                data[winner]["우승 횟수"] += 1
+    ranking = sorted(data.values(), key=lambda x: (-(x["승리 수"] / x["대결 수"] if x["대결 수"] else -1), -x["승리 수"], x["반찬"]))
+    table = [{**d, "승률": f'{100*d["승리 수"]/d["대결 수"]:.1f}%' if d["대결 수"] else "아직 알 수 없음"} for d in ranking]
+    st.dataframe(table, use_container_width=True, hide_index=True, column_order=["반찬", "대결 수", "승리 수", "승률", "우승 횟수"])
+    st.caption("대결 기록이 없는 후보는 승률을 아직 알 수 없어 그래프에서 수치가 표시되지 않습니다.")
+    fig = go.Figure(go.Bar(
+        x=[100*d["승리 수"]/d["대결 수"] if d["대결 수"] else None for d in ranking[::-1]],
+        y=[d["반찬"] for d in ranking[::-1]],
+        orientation="h",
+        text=[f'{100*d["승리 수"]/d["대결 수"]:.1f}%' if d["대결 수"] else "기록 없음" for d in ranking[::-1]],
+        textposition="auto",
+        marker=dict(color="#a77bff"),
+        hovertemplate="%{y}: %{text}<extra></extra>",
+    ))
+    fig.update_layout(title="반찬별 승률 비교", xaxis_title="승률 (%)", yaxis_title="", xaxis=dict(range=[0, 105], ticksuffix="%"), height=480, template="plotly_dark", margin=dict(l=15, r=15, t=65, b=35))
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+STYLE = {
     "제육볶음": ("🔥", "불맛의 챔피언", "HOT & SPICY"),
     "간장찜닭": ("🍗", "달콤짭짤 강자", "SWEET & SAVORY"),
     "가자미순살튀김": ("🐟", "바삭함의 정석", "CRISPY MASTER"),
@@ -299,8 +366,13 @@ st.markdown(
 st.markdown(stages_bar(completed), unsafe_allow_html=True)
 st.progress(completed / TOTAL_DUELS, text=f"저장 확인된 대결 {completed} / 7")
 
-if game["phase"] == "locked":
-    pending = game["pending"]
+tab_game, tab_stats = st.tabs(["⚔️ 월드컵 대결", "📊 학급 전체 분석"])
+with tab_stats:
+    show_class_analysis()
+
+with tab_game:
+    if game["phase"] == "locked":
+        pending = game["pending"]
     st.markdown(
         '<div class="status-panel">'
         '<h3>🔒 대결이 안전하게 잠겼어요</h3>'
@@ -320,7 +392,7 @@ if game["phase"] == "locked":
     st.caption("서버 응답이 유실됐어도 실제로 저장되었을 수 있어 자동 재전송하지 않아요.")
     st.stop()
 
-if game["phase"] == "done":
+    if game["phase"] == "done":
     if not game["celebrated"]:
         st.balloons()
         game["celebrated"] = True
@@ -347,7 +419,7 @@ if game["phase"] == "done":
     )
     st.stop()
 
-if game["round_intro"]:
+    if game["round_intro"]:
     st.markdown(
         '<div class="round-transition" aria-hidden="true">'
         f'<div class="transition-text">⚡ {escape(game["round_intro"])} ⚡</div>'
@@ -356,33 +428,33 @@ if game["round_intro"]:
     )
     game["round_intro"] = None
 
-if game["last_result"]:
+    if game["last_result"]:
     st.markdown(
         f'<div class="win-flash">✨ <strong>{escape(game["last_result"])}</strong>'
         ' 승리! &nbsp; | &nbsp; 저장 확인 완료 ✅</div>',
         unsafe_allow_html=True,
     )
 
-left_menu, right_menu = current_pair(game)
-round_title = round_name(len(game["participants"]))
-match_no = game["match_index"] + 1
-match_total = len(game["participants"]) // 2
+    left_menu, right_menu = current_pair(game)
+    round_title = round_name(len(game["participants"]))
+    match_no = game["match_index"] + 1
+    match_total = len(game["participants"]) // 2
 
-st.markdown(
+    st.markdown(
     f'<div class="section-eyebrow">⚡ ROUND {escape(round_title)} · '
     f'FIGHT {match_no:02}/{match_total:02} ⚡</div>'
     '<div class="section-title">누가 다음 라운드에 진출할까?</div>'
     f'<div class="section-sub">전체 {completed + 1}번째 선택 · '
     '마음에 드는 반찬 하나를 눌러 주세요</div>',
     unsafe_allow_html=True,
-)
-st.markdown(
+    )
+    st.markdown(
     '<div class="vs-area"><div class="vs-core">VS</div></div>',
     unsafe_allow_html=True,
-)
+    )
 
-left_col, right_col = st.columns(2, gap="medium")
-with left_col:
+    left_col, right_col = st.columns(2, gap="medium")
+    with left_col:
     with st.container(border=True):
         st.markdown(duel_card(left_menu, "left"), unsafe_allow_html=True)
         choose_left = st.button(
@@ -391,7 +463,7 @@ with left_col:
             use_container_width=True,
             type="primary",
         )
-with right_col:
+    with right_col:
     with st.container(border=True):
         st.markdown(duel_card(right_menu, "right"), unsafe_allow_html=True)
         choose_right = st.button(
@@ -401,22 +473,22 @@ with right_col:
             type="primary",
         )
 
-st.markdown(
+    st.markdown(
     '<div class="hint-note">🛡️ 한 대결당 한 번만 투표 · '
     '저장 확인 후에만 다음 경기로 진출</div>',
     unsafe_allow_html=True,
-)
-if completed:
+    )
+    if completed:
     with st.expander(f"📜 지금까지의 승리 기록 · {completed}대결"):
         st.markdown(winner_history(game), unsafe_allow_html=True)
 
-st.markdown(
+    st.markdown(
     f'<div class="game-id">🔐 익명 게임 · ID {escape(game["game_id"][:12])}'
     ' · 개인 정보 입력 없음</div>',
     unsafe_allow_html=True,
-)
+    )
 
-if choose_left or choose_right:
+    if choose_left or choose_right:
     selected = left_menu if choose_left else right_menu
     with st.spinner("⚡ 기록 저장 및 승리 확인 중..."):
         save_and_advance(selected)
