@@ -137,7 +137,6 @@ def save_and_advance(winner: str) -> None:
 
 
 
-MENU_
 def show_class_analysis():
     st.subheader("📊 학급 전체 급식 월드컵 분석")
     if st.button("🔄 결과 다시 불러오기", key="reload_stats"):
@@ -203,7 +202,7 @@ def show_class_analysis():
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
-STYLE = {
+MENU_STYLE = {
     "제육볶음": ("🔥", "불맛의 챔피언", "HOT & SPICY"),
     "간장찜닭": ("🍗", "달콤짭짤 강자", "SWEET & SAVORY"),
     "가자미순살튀김": ("🐟", "바삭함의 정석", "CRISPY MASTER"),
